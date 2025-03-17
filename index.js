@@ -18,7 +18,7 @@ app.use(
   })
 );
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.rm6ii.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+
 // const uri = "mongodb://localhost:27017";
 
 const client = new MongoClient(uri, {
