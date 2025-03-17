@@ -47,6 +47,7 @@ const verifyToken = (req, res, next) => {
 async function run() {
   try {
     const db = client.db("Personal_Portfolio");
+    // create your collection here
     // const skillCollection = db.collection("skills");
 
     const cookieOptions = {
