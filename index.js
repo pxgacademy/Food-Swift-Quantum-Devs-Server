@@ -18,7 +18,8 @@ app.use(
   })
 );
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.rm6ii.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.uioun.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+
 // const uri = "mongodb://localhost:27017";
 
 const client = new MongoClient(uri, {
@@ -46,7 +47,7 @@ const verifyToken = (req, res, next) => {
 
 async function run() {
   try {
-    const db = client.db("Personal_Portfolio");
+    const db = client.db("sample_mflix");
     // create your collection here
     // const skillCollection = db.collection("skills");
 
