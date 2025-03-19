@@ -47,9 +47,9 @@ const verifyToken = (req, res, next) => {
 
 async function run() {
   try {
-    const db = client.db("sample_mflix");
+    const db = client.db("Food_Swift");
     // create your collection here
-    // const skillCollection = db.collection("skills");
+    const userCollection = db.collection("users");
 
     const cookieOptions = {
       httpOnly: true,
