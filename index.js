@@ -66,6 +66,14 @@ async function run() {
     const db = client.db("Food_Swift");
     // create your collection here
     const userCollection = db.collection("users");
+    const skillCollection = db.collection("skills");
+
+    // mongodb realtime stream setup
+    const changeStream = skillCollection.watch();
+    changeStream.on("change", (stream) => {
+      console.log("change event", stream);
+      io.emit("change", stream);
+    });
 
     // socket.io
     io.on("connection", (socket) => {
