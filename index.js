@@ -67,6 +67,19 @@ async function run() {
     // create your collection here
     // const skillCollection = db.collection("skills");
 
+    
+    const skillCollection = db.collection("skills");
+
+    // mongodb realtime stream setup
+    const changeStream = skillCollection.watch()
+    changeStream.on("change",(stream) => {
+      console.log("change event", stream);
+      io.emit("change", stream);
+      
+    })
+
+
+
     // socket.io
     io.on("connection", (socket) => {
       console.log("socket.io connected", socket.id);
