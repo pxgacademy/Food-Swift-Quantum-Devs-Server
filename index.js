@@ -116,7 +116,22 @@ async function run() {
       }
     });
 
-    // your routes will be here
+    // create a new user and check if it already exists or not by email
+    app.post("/users", async (req, res, next) => {
+      try {
+        const user = req.body;
+        const existingUser = await userCollection.findOne({
+          email: user?.email,
+        });
+        if (existingUser)
+          return res.status(400).send({ message: "Email already exists" });
+
+        const result = await userCollection.insertOne(user);
+        res.status(201).send(result);
+      } catch (error) {
+        next(error);
+      }
+    });
 
     await client.connect();
     console.log("Connected to MongoDB successfully!");
