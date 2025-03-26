@@ -133,6 +133,36 @@ async function run() {
       }
     });
 
+    // create a get request to get isBlock from user collection filtered by email
+    app.get("/users/isBlocked/:email", async (req, res, next) => {
+      try {
+        const { email } = req?.params;
+        const user = await userCollection.findOne({ email });
+        if (!user) return res.status(404).send({ message: "User not found" });
+        res.send({ isBlock: user?.isBlock });
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // create a patch request for user collection filtered by email, change isBlock: true
+    app.patch("/users/block-req-one/:email", async (req, res, next) => {
+      try {
+        const { email } = req?.params;
+        const result = await userCollection.updateOne(
+          { email },
+          { $set: { isBlock: true } }
+        );
+
+        if (result.matchedCount === 0)
+          return res.status(404).send({ message: "User not found" });
+
+        res.send(result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
     await client.connect();
     console.log("Connected to MongoDB successfully!");
   } catch (error) {
@@ -143,7 +173,7 @@ async function run() {
 run();
 
 app.get("/", (req, res) => {
-  res.status(200).send("Portfolio Server is running");
+  res.status(200).send("Food Swift Server is running");
 });
 
 // Global Error Handling Middleware
