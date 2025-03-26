@@ -63,22 +63,17 @@ const verifyToken = (req, res, next) => {
 
 async function run() {
   try {
-    const db = client.db("Personal_Portfolio");
+    const db = client.db("Food_Swift");
     // create your collection here
-    // const skillCollection = db.collection("skills");
-
-    
+    const userCollection = db.collection("users");
     const skillCollection = db.collection("skills");
 
     // mongodb realtime stream setup
-    const changeStream = skillCollection.watch()
-    changeStream.on("change",(stream) => {
+    const changeStream = skillCollection.watch();
+    changeStream.on("change", (stream) => {
       console.log("change event", stream);
       io.emit("change", stream);
-      
-    })
-
-
+    });
 
     // socket.io
     io.on("connection", (socket) => {
@@ -121,7 +116,52 @@ async function run() {
       }
     });
 
-    // your routes will be here
+    // create a new user and check if it already exists or not by email
+    app.post("/users", async (req, res, next) => {
+      try {
+        const user = req.body;
+        const existingUser = await userCollection.findOne({
+          email: user?.email,
+        });
+        if (existingUser)
+          return res.status(400).send({ message: "Email already exists" });
+
+        const result = await userCollection.insertOne(user);
+        res.status(201).send(result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // create a get request to get isBlock from user collection filtered by email
+    app.get("/users/isBlocked/:email", async (req, res, next) => {
+      try {
+        const { email } = req?.params;
+        const user = await userCollection.findOne({ email });
+        if (!user) return res.status(404).send({ message: "User not found" });
+        res.send({ isBlock: user?.isBlock });
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // create a patch request for user collection filtered by email, change isBlock: true
+    app.patch("/users/block-req-one/:email", async (req, res, next) => {
+      try {
+        const { email } = req?.params;
+        const result = await userCollection.updateOne(
+          { email },
+          { $set: { isBlock: true } }
+        );
+
+        if (result.matchedCount === 0)
+          return res.status(404).send({ message: "User not found" });
+
+        res.send(result);
+      } catch (error) {
+        next(error);
+      }
+    });
 
     await client.connect();
     console.log("Connected to MongoDB successfully!");
@@ -133,7 +173,7 @@ async function run() {
 run();
 
 app.get("/", (req, res) => {
-  res.status(200).send("Portfolio Server is running");
+  res.status(200).send("Food Swift Server is running");
 });
 
 // Global Error Handling Middleware
