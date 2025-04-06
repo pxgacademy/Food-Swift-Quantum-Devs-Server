@@ -1,12 +1,13 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const jwt = require("jsonwebtoken");
-const cookieParser = require("cookie-parser");
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const http = require("http");
-const { Server } = require("socket.io");
+import dotenv from "dotenv";
+import express from "express";
+import cors from "cors";
+import jwt from "jsonwebtoken";
+import cookieParser from "cookie-parser";
+import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
+import { Server } from "socket.io";
+import http from "http";
 
+dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 const server = http.createServer(app);
@@ -61,7 +62,8 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-async function run() {
+// immediately invoked function
+(async () => {
   try {
     const db = client.db("Food_Swift");
     // create your collection here
@@ -168,9 +170,7 @@ async function run() {
   } catch (error) {
     console.log("MongoDB Connection Error:", error);
   }
-}
-
-run();
+})();
 
 app.get("/", (req, res) => {
   res.status(200).send("Food Swift Server is running");
