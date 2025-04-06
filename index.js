@@ -1,24 +1,42 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const jwt = require("jsonwebtoken");
-const cookieParser = require("cookie-parser");
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+import dotenv from "dotenv";
+import express from "express";
+import cors from "cors";
+import jwt from "jsonwebtoken";
+import cookieParser from "cookie-parser";
+import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
+import { Server } from "socket.io";
+import http from "http";
 
+dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "https://food-delivery-app-quantum-devs.web.app/",
+    ],
+    credentials: true,
+  },
+});
 
 // Middlewares
 app.use(cookieParser());
 app.use(express.json());
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: [
+      "http://localhost:5173",
+      "https://food-delivery-app-quantum-devs.web.app/",
+    ],
     credentials: true,
   })
 );
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.rm6ii.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.uioun.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+
 // const uri = "mongodb://localhost:27017";
 
 const client = new MongoClient(uri, {
@@ -44,10 +62,34 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-async function run() {
+// immediately invoked function
+(async () => {
   try {
-    const db = client.db("Personal_Portfolio");
-    // const skillCollection = db.collection("skills");
+    const db = client.db("Food_Swift");
+    // create your collection here
+    const userCollection = db.collection("users");
+    const skillCollection = db.collection("skills");
+
+    // mongodb realtime stream setup
+    const changeStream = skillCollection.watch();
+    changeStream.on("change", (stream) => {
+      console.log("change event", stream);
+      io.emit("change", stream);
+    });
+
+    // socket.io
+    io.on("connection", (socket) => {
+      console.log("socket.io connected", socket.id);
+
+      socket.on("message", (data) => {
+        console.log("message received", data);
+        io.emit("message", data);
+      });
+
+      socket.on("disconnect", () => {
+        console.log("socket.io disconnected", socket.id);
+      });
+    });
 
     const cookieOptions = {
       httpOnly: true,
@@ -76,19 +118,62 @@ async function run() {
       }
     });
 
-    // your routes will be here
+    // create a new user and check if it already exists or not by email
+    app.post("/users", async (req, res, next) => {
+      try {
+        const user = req.body;
+        const existingUser = await userCollection.findOne({
+          email: user?.email,
+        });
+        if (existingUser)
+          return res.status(400).send({ message: "Email already exists" });
+
+        const result = await userCollection.insertOne(user);
+        res.status(201).send(result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // create a get request to get isBlock from user collection filtered by email
+    app.get("/users/isBlocked/:email", async (req, res, next) => {
+      try {
+        const { email } = req?.params;
+        const user = await userCollection.findOne({ email });
+        if (!user) return res.status(404).send({ message: "User not found" });
+        res.send({ isBlock: user?.isBlock });
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // create a patch request for user collection filtered by email, change isBlock: true
+    app.patch("/users/block-req-one/:email", async (req, res, next) => {
+      try {
+        const { email } = req?.params;
+        const result = await userCollection.updateOne(
+          { email },
+          { $set: { isBlock: true } }
+        );
+
+        if (result.matchedCount === 0)
+          return res.status(404).send({ message: "User not found" });
+
+        res.send(result);
+      } catch (error) {
+        next(error);
+      }
+    });
 
     await client.connect();
     console.log("Connected to MongoDB successfully!");
   } catch (error) {
     console.log("MongoDB Connection Error:", error);
   }
-}
-
-run();
+})();
 
 app.get("/", (req, res) => {
-  res.status(200).send("Portfolio Server is running");
+  res.status(200).send("Food Swift Server is running");
 });
 
 // Global Error Handling Middleware
@@ -98,6 +183,6 @@ app.use((err, req, res, next) => {
     .send({ message: "Internal Server Error", error: err.message });
 });
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
