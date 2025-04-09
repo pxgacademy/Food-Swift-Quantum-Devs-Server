@@ -16,7 +16,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       "http://localhost:5173",
-      "https://food-delivery-app-quantum-devs.web.app/",
+      "https://food-delivery-app-quantum-devs.web.app",
     ],
     credentials: true,
   },
@@ -29,7 +29,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://food-delivery-app-quantum-devs.web.app/",
+      "https://food-delivery-app-quantum-devs.web.app",
     ],
     credentials: true,
   })
@@ -69,6 +69,7 @@ const verifyToken = (req, res, next) => {
     // create your collection here
     const userCollection = db.collection("users");
     const skillCollection = db.collection("skills");
+    const restaurantCollection = db.collection("restaurants");
 
     // mongodb realtime stream setup
     const changeStream = skillCollection.watch();
@@ -160,6 +161,19 @@ const verifyToken = (req, res, next) => {
           return res.status(404).send({ message: "User not found" });
 
         res.send(result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // insert a restaurant
+    app.post("/restaurants", async (req, res, next) => {
+      try {
+        const value = req.body;
+        value.createdAt = Date.now();
+        console.log(value);
+        const result = await restaurantCollection.insertOne(value);
+        res.status(201).send(result);
       } catch (error) {
         next(error);
       }
