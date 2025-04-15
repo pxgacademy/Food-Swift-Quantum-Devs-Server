@@ -68,29 +68,115 @@ const verifyToken = (req, res, next) => {
     const db = client.db("Food_Swift");
     // create your collection here
     const userCollection = db.collection("users");
-    const skillCollection = db.collection("skills");
+    // const skillCollection = db.collection("skills");
     const restaurantCollection = db.collection("restaurants");
+    const orderCollection = db.collection('orders')
+    const locationCollection = db.collection('locations')
 
     // mongodb realtime stream setup
-    const changeStream = skillCollection.watch();
-    changeStream.on("change", (stream) => {
-      console.log("change event", stream);
-      io.emit("change", stream);
-    });
+    // const changeStream = skillCollection.watch();
+    // changeStream.on("change", (stream) => {
+    //   console.log("change event", stream);
+    //   io.emit("change", stream);
+    // });
+
+    // socket.io authentic middleware
+    io.use(async(socket, next) => {
+      try{
+        const token = socket.handshake.auth.token
+        if(!token){
+          return next(new Error('Authentication error: No token provided'))
+        }
+        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
+        socket.user = decoded
+        next()
+      }
+      catch(error){
+        next(new Error('Authentication error: Invalid token'))
+      }
+    })
+
 
     // socket.io
-    io.on("connection", (socket) => {
-      console.log("socket.io connected", socket.id);
+    // io.on("connection", (socket) => {
+    //   console.log("socket.io connected", socket.id);
 
-      socket.on("message", (data) => {
-        console.log("message received", data);
-        io.emit("message", data);
-      });
+    //   socket.on("message", (data) => {
+    //     console.log("message received", data);
+    //     io.emit("message", data);
+    //   });
 
-      socket.on("disconnect", () => {
-        console.log("socket.io disconnected", socket.id);
-      });
-    });
+    //   socket.on("disconnect", () => {
+    //     console.log("socket.io disconnected", socket.id);
+    //   });
+    // });
+
+
+
+    // socket.io connection handling
+    io.on('connection', (socket) => {
+      console.log(`Socket.io connected: ${socket.id}, User: ${socket.user.email}`)
+      // socket.io room
+      socket.on('joinOrderRoom', (orderId) => {
+        if(!orderId || typeof orderId !== 'string'){
+          return socket.emit('error', {message: 'Invalid or missing orderId'})
+        }
+        socket.join(orderId)
+        console.log(`${socket.user.email} joined order room: ${orderId}`)
+      })
+      // socket.io delivery agent location
+      socket.on('updateLocation', async({orderId, latitude, longitude}) => {
+        try {
+          // input validation
+          if(!orderId || typeof orderId !== 'string'){
+            return socket.emit('error', {message: 'Invalid or missing orderId'})
+          }
+          if(typeof latitude !== 'number' || typeof longitude !== 'number'){
+            return socket.emit('error', {message: 'Invalid latitude or longitude'})
+          }
+          if(latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180){
+            return socket.emit('error', {message: 'Latitude or longitude out of range'})
+          }
+          const user = await userCollection.findOne({email: socket.user.email})
+          if (!user) {
+            return socket.emit("error", { message: "User not found" });
+          }
+          if(user.role !== 'deliveryAgent'){
+            return socket.emit('error', {message: 'unauthorized: Only delivery agents can update location'})
+          }
+          // location data create
+          const locationData = {
+            orderId,
+            deliveryAgentEmail: socket.user.email,
+            latitude,
+            longitude,
+            timestamp: new Date(),
+          }
+          await locationCollection.insertOne(locationData)
+          // realtime location broadcast
+          io.to(orderId).emit('locationUpdate', locationData)
+          console.log(`location update for order ${orderId}: ${latitude}, ${longitude}`)
+        } catch (error) {
+          socket.emit('error', {message: 'Failed to update location', error: error.message})
+        }
+      })
+      // socket.io disconnect
+      socket.on('disconnect', () => {
+        console.log(`Socket.io disconnected: ${socket.id}`)
+      })
+    })
+
+    app.post('/orders', verifyToken, async(req, res, next) => {
+      try {
+        const order = req.body
+        order.createdAt = new Date()
+        order.status = "pending"
+        const result = await orderCollection.insertOne(order)
+        res.status(201).send(result)
+      } catch (error) {
+        next(error)
+      }
+    })
 
     const cookieOptions = {
       httpOnly: true,
