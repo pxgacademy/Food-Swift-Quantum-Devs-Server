@@ -72,8 +72,9 @@ const verifyToken = (req, res, next) => {
     const restaurantCollection = db.collection("restaurants");
     const orderCollection = db.collection('orders')
     const locationCollection = db.collection('locations')
+    const messageCollection = db.collection('messages')
 
-    // mongodb realtime stream setup
+
     // const changeStream = skillCollection.watch();
     // changeStream.on("change", (stream) => {
     //   console.log("change event", stream);
@@ -97,25 +98,16 @@ const verifyToken = (req, res, next) => {
     })
 
 
-    // socket.io
-    // io.on("connection", (socket) => {
-    //   console.log("socket.io connected", socket.id);
-
-    //   socket.on("message", (data) => {
-    //     console.log("message received", data);
-    //     io.emit("message", data);
-    //   });
-
-    //   socket.on("disconnect", () => {
-    //     console.log("socket.io disconnected", socket.id);
-    //   });
-    // });
 
 
 
     // socket.io connection handling
     io.on('connection', (socket) => {
       console.log(`Socket.io connected: ${socket.id}, User: ${socket.user.email}`)
+
+
+
+
       // socket.io room
       socket.on('joinOrderRoom', (orderId) => {
         if(!orderId || typeof orderId !== 'string'){
@@ -127,7 +119,7 @@ const verifyToken = (req, res, next) => {
       // socket.io delivery agent location
       socket.on('updateLocation', async({orderId, latitude, longitude}) => {
         try {
-          // input validation
+          // input validation socket.io
           if(!orderId || typeof orderId !== 'string'){
             return socket.emit('error', {message: 'Invalid or missing orderId'})
           }
@@ -160,6 +152,40 @@ const verifyToken = (req, res, next) => {
           socket.emit('error', {message: 'Failed to update location', error: error.message})
         }
       })
+
+      // chat room join event
+      socket.on('joinChatRoom', ({senderEmail, receiverEmail}) => {
+        const roomId = [senderEmail, receiverEmail].sort().join('_')
+        socket.join(roomId)
+        console.log(`${senderEmail} joined chat room with ${receiverEmail}`)
+      })
+
+      // send message
+      socket.on('sendMessage', async({senderEmail, receiverEmail, message}) => {
+
+        // validation
+        if(!senderEmail || !receiverEmail || !message){
+          return socket.emit('error', {message: 'Missing fields in message'})
+        }
+        const roomId = [senderEmail, receiverEmail].sort().join('_')
+
+        const msgData = {
+          senderEmail,
+          receiverEmail,
+          message,
+          timestamp: new Date()
+        }
+
+        await messageCollection.insertOne(msgData)
+
+        // Emit the message to both users
+        io.to(roomId).emit("receiveMessage", msgData)
+        console.log(`Message from ${senderEmail} to ${receiverEmail}: ${message}`)
+
+      })
+
+
+
       // socket.io disconnect
       socket.on('disconnect', () => {
         console.log(`Socket.io disconnected: ${socket.id}`)
