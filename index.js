@@ -119,7 +119,7 @@ const verifyToken = (req, res, next) => {
       // socket.io delivery agent location
       socket.on('updateLocation', async({orderId, latitude, longitude}) => {
         try {
-          // input validation
+          // input validation socket.io
           if(!orderId || typeof orderId !== 'string'){
             return socket.emit('error', {message: 'Invalid or missing orderId'})
           }
