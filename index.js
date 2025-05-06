@@ -68,29 +68,7 @@ const verifyToken = (req, res, next) => {
     const db = client.db("Food_Swift");
     // create your collection here
     const userCollection = db.collection("users");
-    const skillCollection = db.collection("skills");
     const restaurantCollection = db.collection("restaurants");
-
-    // mongodb realtime stream setup
-    const changeStream = skillCollection.watch();
-    changeStream.on("change", (stream) => {
-      console.log("change event", stream);
-      io.emit("change", stream);
-    });
-
-    // socket.io
-    io.on("connection", (socket) => {
-      console.log("socket.io connected", socket.id);
-
-      socket.on("message", (data) => {
-        console.log("message received", data);
-        io.emit("message", data);
-      });
-
-      socket.on("disconnect", () => {
-        console.log("socket.io disconnected", socket.id);
-      });
-    });
 
     const cookieOptions = {
       httpOnly: true,
@@ -129,6 +107,7 @@ const verifyToken = (req, res, next) => {
         if (existingUser)
           return res.status(400).send({ message: "Email already exists" });
 
+        user.role = "customer";
         const result = await userCollection.insertOne(user);
         res.status(201).send(result);
       } catch (error) {
@@ -171,11 +150,36 @@ const verifyToken = (req, res, next) => {
       try {
         const value = req.body;
         value.createdAt = Date.now();
-        console.log(value);
         const result = await restaurantCollection.insertOne(value);
         res.status(201).send(result);
       } catch (error) {
         next(error);
+      }
+    });
+
+    // get restaurant name and object ids filtered by email
+    app.get("/restaurant-ids/:email", async (req, res, next) => {
+      try {
+        const { email } = req.params;
+        const result = await restaurantCollection
+          .find({ email }, { projection: { name: 1 } })
+          .toArray();
+        res.status(201).send(result);
+      } catch (error) {
+        next(error);
+      }
+    });
+
+    // get restaurants filtered by city
+    app.get("/restaurants/:city_name", async (req, res, next) => {
+      try {
+        const { city_name } = req.params;
+        const result = await restaurantCollection
+          .find({ city: city_name })
+          .toArray();
+        res.status(201).send(result);
+      } catch (error) {
+        next();
       }
     });
 
